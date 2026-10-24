@@ -15,7 +15,6 @@ def load_key() -> bytes:
     key = os.environ.get("ENCRYPTION_KEY")
     if not key:
         raise ValueError("ENCRYPTION_KEY environment variable is not set.")
-        return Fernet.generate_key()
     return key.encode()
 
 if __name__ == "__main__":
@@ -29,4 +28,14 @@ if __name__ == "__main__":
     print(f"Encrypted2: {encrypted2}")
 
     decrypted = enc.decrypt(encrypted)
-    
+    print(f"Decrypted: {decrypted}")
+
+    decrypted2 = enc.decrypt(encrypted2)
+    print(f"Decrypted2: {decrypted2}")
+
+    enc2 = Encryptor(Fernet.generate_key())
+    try:
+        decrypted_invalid = enc2.decrypt(encrypted)
+        print(f"Decrypted with invalid key: {decrypted_invalid}")
+    except InvalidToken:
+        print("Failed to decrypt with invalid key.")
