@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
+from unicodedata import category
 
 class Category(Enum):
     HOUSING = "housing"
@@ -36,6 +37,13 @@ class Transaction:
     seller: str
     amount: Decimal
     category: Category = Category.OTHER
+
+@dataclass
+class Budget:
+    id: int
+    user_id: int
+    category: Category
+    monthly_limit: Decimal
 
 if __name__ == "__main__":
     user = User(id=1, name="John Doe", monthly_income=Decimal("5000.00"))

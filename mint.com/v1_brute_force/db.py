@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from models import User, Account, Transaction, Category
+from models import User, Account, Transaction, Category, Budget
 
 class InMemoryDB:
 
@@ -9,6 +9,7 @@ class InMemoryDB:
         self.users: list[User] = []
         self.accounts: list[Account] = []
         self.transactions: list[Transaction] = []
+        self.budgets: list[Budget] = []
         self._next_id = 1
 
     def _new_id(self) -> int:
@@ -62,6 +63,38 @@ class InMemoryDB:
 
     def get_transactions_by_user(self, user_id: int) -> list[Transaction]:
         return [t for t in self.transactions if t.user_id == user_id]
+
+    def get_user(self, user_id: int) -> User | None:
+        for user in self.users:
+            if user.id == user_id:
+                return user
+        return None
+
+    def update_transaction_category(self, transaction_id: int, new_category: Category) -> Transaction | None:
+        for transaction in self.transactions:
+            if transaction.id == transaction_id:
+                transaction.category = new_category
+                return transaction
+        return None
+
+    def set_budget(self, user_id: int, category: Category, monthly_limit: Decimal) -> Budget:
+        # Nếu user đã có budget cho category này rồi thì cập nhật lại monthly_limit (override)
+        for budget in self.budgets:
+            if budget.user_id == user_id and budget.category == category:
+                budget.monthly_limit = monthly_limit
+                return budget
+        # Nếu chưa có thì tạo mới và thêm vào self.budgets
+        budget = Budget(
+            id=self._new_id(),
+            user_id=user_id,
+            category=category,
+            monthly_limit=monthly_limit
+        )
+        self.budgets.append(budget)
+        return budget
+
+    def get_budget_by_user(self, user_id: int) -> list[Budget]:
+        return [b for b in self.budgets if b.user_id == user_id]
 
 if __name__ == "__main__":
     db = InMemoryDB()
