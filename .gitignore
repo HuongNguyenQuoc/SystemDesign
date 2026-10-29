@@ -1,2 +1,5 @@
 /mint
-/mint-chat.txt
+mint-chat.txt
+.encryption.key
+__pycache__/
+*.pyc

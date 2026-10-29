@@ -1,5 +1,8 @@
-import os
 from cryptography.fernet import Fernet, InvalidToken
+from pathlib import Path
+
+# File khóa nằm cùng thư mục với security.py.
+KEYFILE = Path(__file__).resolve().parent / ".encryption.key"
 
 class Encryptor:
     def __init__(self, key: bytes):
@@ -12,10 +15,16 @@ class Encryptor:
         return self._fernet.decrypt(ciphertext.encode()).decode()
 
 def load_key() -> bytes:
-    key = os.environ.get("ENCRYPTION_KEY")
-    if not key:
-        raise ValueError("ENCRYPTION_KEY environment variable is not set.")
-    return key.encode()
+    try:
+        # "xb": tạo file mới; nếu đã tồn tại thì không ghi đè.
+        with KEYFILE.open("xb") as f:
+            f.write(Fernet.generate_key())
+        KEYFILE.chmod(0o600)  # Chỉ owner có quyền đọc/ghi
+
+    except FileExistsError:
+        pass  # File đã tồn tại, không làm gì cả
+
+    return KEYFILE.read_bytes().strip()
 
 if __name__ == "__main__":
     enc = Encryptor(load_key())
