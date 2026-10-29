@@ -1,0 +1,647 @@
+ ▐▛███▛█   Claude Code v2.1.309
+▝▜██████▀  Opus 5.5 · Claude Pro
+ ▝▝   ▝▝   ~/Documents/System Design
+
+  Introducing Opus 5.5
+  Get to finished work sooner with Opus 5.5. Switch anytime with /model.
+
+❯ <ide_opened_file>The user opened the file /home/huongpc/Documents/System      
+  Design/mint/README.md in the IDE. This may or may not be related to the       
+  current task.</ide_opened_file>                                               
+
+❯ https://github.com/donnemartin/system-design-primer/tree/master/solutions/sys 
+  tem_design/mint Dựa vào cái link GitHub này bây giờ tôi muốn thiết kế lại     
+  toàn bộ của cái System Design Min này vào một cái folder tôi đã tạo mới là    
+  min.t.com. Nhưng bạn phải hướng dẫn tôi từng bước chi tiết từng bước một      
+  thôi, tách nhỏ ra bạn không được tự code cho tôi mà hãy đưa tôi ý tưởng và để 
+  tôi code lại. Ok, bạn có thể đọc toàn bộ cách code cho thiết kế hệ thống min  
+  này trong thư mục min còn thư mục min.com là để tôi sẽ code ở trong đó. Bây   
+  giờ thì sẽ làm theo từng bước một. Theo từng bước ở trong cái readme này nó   
+  đọc. Tại vì mình sẽ phải đi từ nói chung là đi từ cái biện pháp brute force   
+  đến cái biện pháp là optimize sau                                             
+
+  Listed 1 directory, ran 2 shell commands, wrote 4 memories (ctrl+o to expand)
+
+● Mình đã đọc mint/README.md, mint_snippets.py và mint_mapreduce.py. Thư mục
+  mint.com/ đang trống, và mình sẽ không viết gì vào đó. Bạn tự code hết, mình
+  chỉ đưa hướng dẫn và review.
+
+  Ngôn ngữ: mình mặc định dùng Python vì bản gốc viết bằng Python. Nếu bạn muốn
+  dùng ngôn ngữ khác thì báo mình trước khi bắt đầu nhé.
+
+  Lộ trình tổng thể (đi từ brute force đến optimize)
+
+  ┌──────┬──────────────────────────────────────────────────────┬───────────┐
+  │ Bước │                        Làm gì                        │ Ứng với   │
+  │      │                                                      │  README   │
+  ├──────┼──────────────────────────────────────────────────────┼───────────┤
+  │ 1    │ Liệt kê use case và constraint, ước lượng dung lượng │ Step 1    │
+  ├──────┼──────────────────────────────────────────────────────┼───────────┤
+  │ 2    │ Vẽ high-level design, dựng khung thư mục             │ Step 2    │
+  ├──────┼──────────────────────────────────────────────────────┼───────────┤
+  │ 3    │ Brute force: viết một file Python, lưu hết dữ liệu   │ Step 3    │
+  │      │ trong RAM, các phần gọi hàm trực tiếp cho nhau       │           │
+  ├──────┼──────────────────────────────────────────────────────┼───────────┤
+  │ 4    │ Lưu dữ liệu xuống SQL (SQLite), thêm index           │ Step 3    │
+  ├──────┼──────────────────────────────────────────────────────┼───────────┤
+  │ 5    │ Viết Accounts REST API (POST /api/v1/account)        │ Step 3    │
+  ├──────┼──────────────────────────────────────────────────────┼───────────┤
+  │ 6    │ Extract transaction: làm đồng bộ trước, thấy chậm    │ Step 3    │
+  │      │ thì chuyển sang Queue + Worker                       │           │
+  ├──────┼──────────────────────────────────────────────────────┼───────────┤
+  │ 7    │ Category Service: bắt đầu bằng dict seed sẵn, sau đó │ Step 3    │
+  │      │  thêm crowd override dùng heap                       │           │
+  ├──────┼──────────────────────────────────────────────────────┼───────────┤
+  │      │ Budget và Notification: GROUP BY mỗi lần đọc, sau đó │           │
+  │ 8    │  tính sẵn bảng monthly_spending, cuối cùng dùng      │ Step 3    │
+  │      │ MapReduce                                            │           │
+  ├──────┼──────────────────────────────────────────────────────┼───────────┤
+  │ 9    │ Scale: cache-aside, read replica, object store,      │ Step 4    │
+  │      │ sharding                                             │           │
+  └──────┴──────────────────────────────────────────────────────┴───────────┘
+
+  Mỗi lần mình chỉ đưa một bước. Bạn làm xong thì gửi lại, mình review rồi mới
+  sang bước tiếp theo.
+
+  ---
+
+  Bước 1: Use case và constraint
+
+  Vì sao làm bước này trước: sau này mỗi lần tối ưu (thêm queue, cache,
+  sharding, MapReduce), bạn phải chỉ ra được con số nào cho thấy cần làm vậy.
+  Không có số thì bạn sẽ không biết lúc nào brute force còn dùng được và lúc nào
+  nó không chịu nổi nữa.
+
+  1.1 Tạo file mint.com/docs/01-requirements.md
+
+  Hãy viết bằng lời của bạn, đừng chép lại README. File gồm 3 mục:
+
+  Use cases (in scope). Bạn có thể tự hỏi:
+  - Hệ thống có mấy loại actor? (gợi ý: một là người, một là chính hệ thống)
+  - User chủ động làm những gì? Service tự động làm những gì?
+  - Khi nào thì lấy transaction về? Việc này có áp dụng cho mọi user không?
+  - User có sửa được category không? Sửa xong thì các giao dịch cũ có được tự
+    phân loại lại không?
+  - Ai đặt budget? Khi nào thì gửi thông báo?
+
+  Tự kiểm tra: bạn nên ra khoảng 4 nhóm use case, cộng thêm 1 yêu cầu phi chức
+  năng.
+
+  Out of scope. Những thứ bạn cố tình không làm.
+
+  Assumptions. Liệt kê các con số đề bài cho: số user, số financial account, số
+  seller, transaction/tháng, read/tháng, tỉ lệ write:read, và thế nào là user
+  "active".
+
+  1.2 Viết script mint.com/docs/capacity.py
+
+  Đây là phần code đầu tiên. Khai báo các hằng số ở đầu file, script tính toán
+  rồi in kết quả ra. Lợi ích là sau này muốn đổi giả định (ví dụ 100 triệu
+  user), bạn chỉ phải sửa một dòng.
+
+  Script cần tính 7 con số:
+  1. Kích thước một transaction: cộng kích thước các field user_id 8B,
+     created_at 5B, seller 32B, amount 5B.
+  2. Dung lượng mới mỗi tháng, đổi ra GB.
+  3. Dung lượng sau 3 năm, đổi ra TB.
+  4. Số write/giây trung bình = transaction/tháng ÷ số giây trong một tháng.
+  5. Số read/giây trung bình.
+  6. RAM cho map seller → category: 50.000 seller, mỗi entry khoảng 255B. Kết
+     quả tính bằng MB.
+  7. Tổng số budget item nếu lưu sẵn cho mọi user (mỗi user 10 category).
+
+  Gợi ý:
+  - README làm tròn một tháng thành 2,5 triệu giây. Bạn thử tính chính xác
+    30*24*3600 rồi so xem lệch bao nhiêu %, và độ lệch đó có đáng bận tâm không.
+  - Lấy 1 GB = 10⁹ byte. Đây là ước lượng nên không cần dùng 1024.
+  - Bài tập phụ: viết hàm human_bytes(n) để in kết quả cho dễ đọc.
+  - Tự tính xong rồi mới mở README ra so.
+
+  1.3 Phần "Kết luận" ở cuối 01-requirements.md
+
+  Đây là phần quan trọng nhất của bước này. Với mỗi con số, viết một câu: con số
+  này ảnh hưởng tới thiết kế như thế nào? Một số câu hỏi gợi ý:
+  - Write nhiều gấp 10 lần read. Vậy nên lo cho đường ghi hay đường đọc trước?
+  - Map seller → category tốn bao nhiêu RAM? Có cần một database riêng cho nó
+    không?
+  - Vài nghìn write/giây dồn vào một SQL database duy nhất thì có ổn không? Bạn
+    chưa cần trả lời chắc chắn, cứ ghi lại thành "câu hỏi mở" để quay lại ở
+    Bước 9.
+  - Chỉ tự động update cho user active trong 30 ngày thì giảm tải được ở đâu?
+  - Notification "không cần gửi ngay" cho phép mình thiết kế thế nào?
+  - Lưu sẵn budget cho mọi cặp user × category thì ra bao nhiêu dòng? Có cách
+    nào để không phải lưu hết không?
+
+  Bước 1 xong khi
+
+  - [ ] docs/01-requirements.md có đủ 4 phần: use cases, out of scope,
+    assumptions, kết luận
+  - [ ] python3 docs/capacity.py chạy được và in ra đủ 7 con số
+  - [ ] Có ít nhất 4 câu kết luận nối một con số với một quyết định thiết kế
+
+  Làm xong bạn gửi mình output của script và phần kết luận. Mình sẽ đối chiếu
+  với bản gốc và chỉ ra chỗ lệch. Sau đó mình chuyển sang Bước 2: vẽ high-level 
+  design.
+
+❯ tôi xong rồi và đã để trong mint.com ô thế không bắt đâù code à hay chưa đến  
+
+  Ran 2 shell commands, wrote 1 memory (ctrl+o to expand)
+
+● Bước 1 thực ra đã có phần code: mục 1.2, viết capacity.py. Bạn chưa làm phần
+  đó. Trong mint.com/ hiện mới có file Excalidraw, tức là bạn đã làm xong mục
+  1.1. Mục 1.2 (capacity.py) và 1.3 (kết luận) vẫn chưa có. Phần code chính của
+  hệ thống sẽ bắt đầu từ Bước 3. Bước 2 sẽ đi nhanh vì bạn đã quen dùng
+  Excalidraw rồi.
+
+  Review mục 1.1
+
+  Các con số trong phần assumptions bạn ghi đúng hết. Phần use case thì còn vài
+  chỗ hiểu lệch đề, cần sửa trước khi đi tiếp. Lý do: nếu hiểu sai từ đây thì
+  các bước sau sẽ thiết kế sai theo.
+
+  ┌──────────────────────┬───────────────────────────────────────────────────┐
+  │       Bạn viết       │                      Vấn đề                       │
+  ├──────────────────────┼───────────────────────────────────────────────────┤
+  │                      │ Account là dữ liệu, tức là thứ bị tác động, không │
+  │ Actor gồm user và    │  phải actor. Actor thứ hai là Service: chính hệ   │
+  │ accounts             │ thống tự chạy mà không cần ai bấm, ví dụ job chạy │
+  │                      │  hằng ngày.                                       │
+  ├──────────────────────┼───────────────────────────────────────────────────┤
+  │                      │ Mint không bán hàng. User mua đồ ở cửa hàng, ngân │
+  │ User "mua thêm cái   │  hàng ghi lại giao dịch, còn Mint chỉ đọc giao    │
+  │ gì đó mới"           │ dịch đó từ ngân hàng về. Vậy trên Mint, user chủ  │
+  │                      │ động làm những gì? Gợi ý: có 3 việc.              │
+  ├──────────────────────┼───────────────────────────────────────────────────┤
+  │ Lấy transaction "khi │ Bạn mới có 1 trong 3 trường hợp. Hai trường hợp   │
+  │  người dùng muốn"    │ còn lại: lần đầu link account, và tự động hằng    │
+  │                      │ ngày, nhưng chỉ cho user active trong 30 ngày.    │
+  ├──────────────────────┼───────────────────────────────────────────────────┤
+  │ Sửa category xong    │ Ngược với đề. Đề ghi rõ không tự động phân loại   │
+  │ thì giao dịch cũ     │ lại. Bạn thử tự trả lời tại sao (gợi ý: 5 tỷ      │
+  │ được phân loại lại   │ transaction mỗi tháng).                           │
+  ├──────────────────────┼───────────────────────────────────────────────────┤
+  │ Budget do user đặt   │ Còn thiếu một ý: Service gợi ý budget dựa trên    │
+  │                      │ thu nhập, sau đó user mới sửa lại (override).     │
+  ├──────────────────────┼───────────────────────────────────────────────────┤
+  │ (không có)           │ Thiếu yêu cầu phi chức năng: high availability.   │
+  ├──────────────────────┼───────────────────────────────────────────────────┤
+  │ Out of scope: ghi    │ Đúng. Bạn thêm "analytics" nữa.                   │
+  │ nhật ký              │                                                   │
+  ├──────────────────────┼───────────────────────────────────────────────────┤
+  │                      │ Sai, và chỗ này quan trọng. Active là có vào Mint │
+  │ Active nghĩa là còn  │  trong 30 ngày qua. Gần như ai cũng giao dịch mỗi │
+  │ đang giao dịch       │  ngày, nhưng ít người mở Mint. Chính vì thế mà    │
+  │                      │ write:read = 10:1.                                │
+  ├──────────────────────┼───────────────────────────────────────────────────┤
+  │                      │ Thiếu 4 ý: traffic không đều, thêm/xoá account là │
+  │ Assumptions          │  việc hiếm, notification không cần gửi ngay, mỗi  │
+  │                      │ user có 10 category.                              │
+  └──────────────────────┴───────────────────────────────────────────────────┘
+
+  Về file: Excalidraw rất hợp để vẽ sơ đồ ở Bước 2. Còn phần requirements thì
+  bạn nên chép ra docs/01-requirements.md để dễ đọc và dễ sửa về sau, đồng thời
+  đổi tên file Untitled-... cho có nghĩa.
+
+  Việc cần làm tiếp
+
+  1. Sửa mục 1.1 theo bảng ở trên.
+
+  2. Viết docs/capacity.py. Đây là phần code đầu tiên. Gợi ý cách chia file:
+  - Đầu file: các hằng số đầu vào, viết HOA (USERS, TX_PER_MONTH,
+    READS_PER_MONTH, SELLERS, ...). Kích thước các field của transaction nên để
+    trong một dict dạng field → bytes. Sau này muốn thêm field thì chỉ cần thêm
+    một dòng.
+  - Giữa file: mỗi con số tính bằng một hàm nhỏ. Hàm nhận tham số, không đọc
+    trực tiếp biến global. Như vậy sau này viết test sẽ dễ.
+  - Cuối file: khối if __name__ == "__main__": để in ra 7 con số.
+  - Bài tập phụ: hàm human_bytes(n) để in 250 GB thay vì 250000000000.
+
+  3. Viết phần kết luận (mục 1.3): mỗi con số đi kèm một câu nói nó ảnh hưởng
+  tới thiết kế thế nào. Các câu hỏi gợi ý vẫn như ở tin nhắn trước.
+
+  Làm xong bạn gửi mình output của python3 docs/capacity.py để mình review, rồi
+  mình sang Bước 2.
+
+❯ bỏ qua các bước này có được không; tôi đọc được trên repo git rồi             
+
+  Wrote 2 memories (ctrl+o to expand)
+
+● Được, mình bỏ qua Bước 1 và 2, mình vào code luôn. Khi tới bước tối ưu cần con
+  số nào (ví dụ 2.000 write/giây), mình sẽ nhắc lại ngay trong bước đó.
+
+  ---
+
+  Bước 3A: Brute force, toàn bộ dữ liệu nằm trong RAM
+
+  Mục tiêu: chạy được luồng "kết nối account → lấy giao dịch về → phân loại"
+  trong một file Python duy nhất. Chưa có DB, chưa có API, chưa có queue. Mình
+  cố tình làm ngây thơ để sau này có cái mà đo và tối ưu.
+
+  Đặt code ở đâu: mint.com/v1_brute_force/mint.py. Sau này mỗi phiên bản là một
+  thư mục riêng (v2_sql/, ...), như vậy bạn chạy được cả hai bản và so tốc độ
+  với nhau.
+
+  Thư viện: chỉ dùng thư viện chuẩn của Python (dataclasses, enum, datetime,
+  decimal, random, hashlib).
+
+  3A.1 Data model
+
+  Dùng @dataclass cho các class dưới đây:
+
+  Class: Category (Enum)
+  Field: HOUSING, FOOD, GAS, SHOPPING, OTHER
+  Ghi chú: Bản gốc trả về None khi không biết seller. Bạn dùng OTHER. Lý do: lúc
+
+  cộng tổng theo category, None dễ gây lỗi.
+  ────────────────────────────────────────
+  Class: User
+  Field: id, name, monthly_income
+  Ghi chú:
+  ────────────────────────────────────────
+  Class: Account
+  Field: id, user_id, account_url, account_login, account_password_hash,
+  created_at, last_update
+  Ghi chú: Hash password bằng hashlib.sha256. Không bao giờ lưu password dạng
+  plaintext.
+  ────────────────────────────────────────
+  Class: Transaction
+  Field: id, account_id, user_id, created_at, seller, amount, category
+  Ghi chú: Kiểu của amount là Decimal, không dùng float.
+
+  3A.2 "Database" trong RAM
+
+  - Tạo class InMemoryDB gồm 3 list: users, accounts, transactions. Thêm một bộ
+    đếm để sinh ID tự tăng.
+  - Cố ý dùng list, chưa dùng dict theo user_id. Như vậy truy vấn nào cũng phải
+    duyệt hết cả list, tức là full table scan. Đó chính là brute force. Đến Bước
+    4 mình sẽ thêm index rồi đo xem nhanh hơn bao nhiêu.
+
+  3A.3 Categorizer (bản đơn giản nhất)
+
+  - Viết một dict seller → Category có sẵn khoảng 5 seller, ví dụ Exxon → GAS,
+    Target → SHOPPING.
+  - Method categorize(seller): tra dict, không tìm thấy thì trả về OTHER.
+  - Chưa làm phần crowd override và heap. Phần đó để Bước 7.
+
+  3A.4 FakeBank, connect và extract
+
+  - FakeBank: có một method trả về danh sách giao dịch giả cho một account:
+    - seller chọn ngẫu nhiên trong khoảng 8–10 cái tên. Cố ý để vài tên không có
+      trong dict của Categorizer.
+    - amount ngẫu nhiên.
+    - ngày ngẫu nhiên trong 2 tháng gần nhất.
+    - gọi random.seed(...) để lần chạy nào cũng ra cùng một kết quả, dễ debug.
+  - connect_account(user_id, url, login, password): tạo Account, lưu vào DB, rồi
+    gọi extract ngay lập tức, tức là chạy đồng bộ. Đây là brute force. Đến Bước
+    6 bạn sẽ thấy vì sao cách này không ổn.
+  - extract_transactions(account_id): gọi FakeBank lấy giao dịch, categorize
+    từng giao dịch, lưu vào db.transactions, rồi cập nhật last_update.
+
+  3A.5 Demo
+
+  Trong khối if __name__ == "__main__"::
+  - tạo 1 user, sau đó connect 2 account cho user đó;
+  - in ra mọi giao dịch của user, mỗi giao dịch một dòng gồm ngày, seller,
+    amount, category.
+
+  Câu hỏi suy nghĩ (chỉ cần ghi câu trả lời ngắn vào comment, chưa phải code)
+
+  1. Vì sao amount phải là Decimal chứ không phải float? Thử chạy 0.1 + 0.2
+     trong Python xem.
+  2. Gọi extract_transactions hai lần cho cùng một account thì có bị trùng giao
+     dịch không? Nếu có, last_update có thể giúp gì?
+  3. Câu khó: README lưu account_password_hash. Nhưng muốn lấy giao dịch thì
+     Mint phải đăng nhập vào ngân hàng bằng password đó. Hash là một chiều,
+     không giải ngược được. Vậy lưu hash có dùng được không? Lẽ ra phải dùng cái
+     gì?
+
+  Xong khi
+
+  - [ ] python3 v1_brute_force/mint.py chạy không lỗi
+  - [ ] In ra giao dịch của 2 account, trong đó có vài giao dịch mang category
+    OTHER
+  - [ ] Đã có câu trả lời cho 3 câu hỏi trên
+
+  Bạn có thể gửi mình review sau mỗi mục nhỏ, hoặc làm xong cả 3A rồi gửi một
+  lần. Phần tiếp theo là 3B: user sửa category, tính chi tiêu theo tháng (bằng
+  cách duyệt toàn bộ giao dịch), budget, gửi thông báo khi sắp vượt budget, và
+  đo thời gian để có mốc so sánh.
+
+❯ Phải để decimal tại vì khi có số phân trong Python thì nó sẽ ra một cái kiểu  
+  gọi là dài ngoài không phải và mình sẽ bật xuống decimal cái thứ hai đó là    
+  gọi extract transactions sẽ bị trùng giao dịch nếu có thì last update mình nó 
+  sẽ cập nhật liên tục và câu hỏi thứ ba là revenue account password hash       
+  nhưng khi mà min đăng nhập vào ngân hàng và password đó thì không thể đăng    
+  nhập bằng hash sẽ được mình sẽ cứ ghi là mật khẩu plain text bình thường thôi 
+  sau khi mà nhận được mật khẩu plain text đấy rồi thì sẽ phải hash nó và kiểm  
+  tra trong database là cái dạng hash được từ cái plain text đấy có đúng với    
+  trong database hay không thì mới cho vào xong rồi bây giờ có thể là hướng dẫn 
+  code từng bước một từng file một hay không                                    
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Bạn chưa có file code nào, nên mình sẽ hướng dẫn từng file một: mỗi lượt một
+  file, bạn viết xong gửi mình review rồi mới sang file tiếp. Trước đó, mình
+  review nhanh 3 câu trả lời của bạn.
+
+  Review 3 câu trả lời
+
+  1. Decimal: bạn trả lời đúng hướng. Lý do gốc là float lưu số ở hệ nhị phân,
+  nên 0.1 không biểu diễn chính xác được. Vì vậy 0.1 + 0.2 ra
+  0.30000000000000004. Một giao dịch thì lệch rất ít, nhưng cộng hàng triệu giao
+  dịch là lệch thành tiền thật.
+  - Lưu ý: tạo Decimal từ chuỗi, ví dụ Decimal("0.1"). Bạn thử in Decimal(0.1)
+    ra sẽ thấy sai ở đâu.
+
+  2. Trùng giao dịch: đúng là sẽ bị trùng. Nhưng last_update không chỉ để "cập
+  nhật liên tục". Nó dùng để chỉ lấy những giao dịch mới hơn last_update, tức là
+  lấy dần phần mới.
+  - Cách thứ hai: ngân hàng thường gắn cho mỗi giao dịch một ID riêng. Mình lưu
+    ID đó vào field external_id, rồi kiểm tra trước khi lưu. Như vậy chạy
+    extract bao nhiêu lần cũng không bị trùng. Tính chất này gọi là idempotent.
+
+  3. Password: bạn đang nhầm giữa hai loại mật khẩu. Cách hash rồi so sánh mà
+  bạn mô tả là đúng, nhưng nó dành cho mật khẩu đăng nhập Mint của user. Câu hỏi
+  đang hỏi về mật khẩu ngân hàng:
+  - Mint phải tự đăng nhập ngân hàng mỗi ngày, kể cả khi user không online. Muốn
+    vậy thì phải lấy lại được plaintext, nên hash không dùng được.
+  - Lưu plaintext thì khi lộ DB là lộ luôn tài khoản ngân hàng của 10 triệu
+    người.
+  - Cách đúng là mã hoá hai chiều (encryption, ví dụ AES), với key cất ở chỗ
+    riêng, ngoài DB.
+  - Ngày nay còn có cách tốt hơn: đăng nhập ngân hàng qua OAuth token của một
+    bên trung gian như Plaid. Khi đó Mint không giữ password nào cả.
+  - Vì vậy mình đổi tên field thành account_password_encrypted và thêm file
+    security.py.
+
+  ---
+
+  Cấu trúc thư mục v1
+
+  mint.com/v1_brute_force/
+  ├── models.py            ← File 1 (làm ngay bây giờ)
+  ├── db.py                ← File 2: InMemoryDB
+  ├── security.py          ← File 3: encrypt/decrypt (giả lập)
+  ├── categorizer.py       ← File 4: seller → category
+  ├── fake_bank.py         ← File 5: sinh giao dịch giả
+  ├── account_service.py   ← File 6: connect_account, extract_transactions
+  └── main.py              ← File 7: demo
+
+  Thứ tự này đi theo phụ thuộc: file sau import file trước, nên file nào viết
+  xong cũng chạy thử được ngay.
+
+  ---
+
+  File 1: models.py
+
+  Nhiệm vụ: định nghĩa dữ liệu. File này chỉ chứa dữ liệu, không có logic gì.
+
+  Import cần dùng: dataclass và field từ dataclasses, datetime, Decimal, Enum.
+
+  Category (Enum)
+
+  - Gồm các giá trị HOUSING, FOOD, GAS, SHOPPING, OTHER.
+  - Value nên dùng chuỗi, ví dụ "housing", thay vì số 0, 1, 2 như README. Lý do:
+    in ra dễ đọc hơn khi debug.
+
+  User (dataclass)
+
+  - id: int
+  - name: str
+  - monthly_income: Decimal
+
+  Account (dataclass)
+
+  - id, user_id
+  - account_url, account_login
+  - account_password_encrypted
+  - created_at
+  - last_update: kiểu datetime | None, mặc định None, nghĩa là account chưa
+    extract lần nào.
+
+  Transaction (dataclass)
+
+  - id, account_id, user_id
+  - external_id: ID của giao dịch phía ngân hàng, dùng để chống trùng.
+  - created_at, seller
+  - amount: Decimal
+  - category: Category
+
+  Ba lỗi hay gặp
+
+  1. Thứ tự field: field có giá trị mặc định phải đứng sau các field không có
+     mặc định, nếu không dataclass sẽ báo lỗi.
+  2. Mặc định là thời gian hiện tại: dùng field(default_factory=datetime.now),
+     đừng viết = datetime.now(). Bạn thử tự đoán vì sao: biểu thức
+     datetime.now() được chạy vào lúc nào?
+  3. Không đặt frozen=True cho Transaction, vì user sẽ sửa category của giao
+     dịch ở bước 3B.
+
+  Câu hỏi suy nghĩ
+
+  Transaction đã có account_id, mà Account lại có user_id. Vậy tại sao
+  Transaction vẫn lưu thêm user_id? (Gợi ý: nghĩ xem truy vấn "lấy mọi giao dịch
+  của user X" sẽ phải làm những gì nếu thiếu field này.)
+
+  Tự kiểm tra
+
+  Ở cuối file, thêm khối if __name__ == "__main__":. Trong khối đó tạo 1 User, 1
+  Account, 1 Transaction rồi print cả 3. Sau đó chạy:
+
+  cd "mint.com/v1_brute_force" && python3 models.py
+
+  File 1 coi như xong khi:
+  - [ ] chạy không lỗi;
+  - [ ] amount in ra dạng Decimal('12.50');
+  - [ ] category in ra dạng <Category.GAS: 'gas'>;
+  - [ ] last_update của Account in ra None.
+
+  Viết xong bạn báo mình, mình sẽ đọc file rồi review. Sau đó mình sang File 2: 
+  db.py.
+
+  Wrote 1 memory (ctrl+o to expand)
+
+● Mình đã lưu thứ tự các file này vào memory. Lần sau mình sẽ tiếp tục đúng từ
+  File 1, kể cả khi bạn mở một phiên chat mới.
+
+❯ đâu đoạn code đâu                                                             
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Thư mục mint.com/ hiện vẫn chưa có file code nào. Vì bạn đã dặn mình không
+  code thay, mình chỉ mô tả nội dung cần có cho File 1, còn bạn sẽ là người viết
+  code — bạn cho mình biết nếu muốn đổi cách làm.
+
+● User answered Claude's questions:
+  ⎿  · Bạn muốn mình hướng dẫn File 1 (models.py) theo cách nào? → Khung điền 
+     chỗ trống (Recommended)
+
+  Wrote 1 memory (ctrl+o to expand)
+
+● Ok, mình đưa khung điền chỗ trống. Bạn tạo file
+  mint.com/v1_brute_force/models.py, chép khung dưới đây vào, rồi thay hết các
+  chỗ ___ và TODO bằng code của bạn.
+
+  from dataclasses import dataclass, field
+  from datetime import datetime
+  from decimal import Decimal
+  from enum import Enum
+
+
+  class Category(Enum):
+      HOUSING = "housing"
+      # TODO: thêm FOOD, GAS, SHOPPING, OTHER
+
+
+  @dataclass
+  class User:
+      id: int
+      name: ___             # TODO
+      monthly_income: ___   # TODO: đây là tiền, nên dùng kiểu gì?
+
+
+  @dataclass
+  class Account:
+      id: int
+      user_id: ___
+      account_url: ___
+      account_login: ___
+      account_password_encrypted: ___
+      created_at: datetime = ___   # TODO: mặc định là lúc tạo object, dùng 
+  field(...)
+      last_update: ___ = ___       # TODO: chưa extract lần nào thì giá trị là 
+  gì? Kiểu phải cho phép giá trị đó
+
+
+  @dataclass
+  class Transaction:
+      id: int
+      account_id: ___
+      user_id: ___
+      external_id: ___      # TODO: ID của giao dịch phía ngân hàng, kiểu gì?
+      created_at: ___       # TODO: xem câu hỏi (a) bên dưới
+      seller: ___
+      amount: ___
+      category: ___ = ___   # TODO: xem câu hỏi (b) bên dưới
+
+
+  if __name__ == "__main__":
+      # TODO 1: tạo một User, monthly_income tạo từ chuỗi
+      # TODO 2: tạo một Account cho user đó, KHÔNG truyền created_at
+      # TODO 3: tạo một Transaction cho account đó
+      # TODO 4: print cả 3 object
+      pass
+
+  Câu hỏi để điền đúng chỗ trống
+
+  - (a) created_at của Account có giá trị mặc định, còn created_at của
+    Transaction thì không. Vì sao? Gợi ý: thời điểm của giao dịch là do ai quyết
+    định, Mint hay ngân hàng?
+  - (b) Vừa extract xong, giao dịch chưa được phân loại thì nên để category là
+    gì?
+  - (c) Hai field có giá trị mặc định đều được đặt ở cuối class. Nếu bạn đưa
+    last_update lên ngay sau id thì Python báo lỗi gì? Hãy thử một lần để nhìn
+    thấy lỗi đó.
+  - (d) Câu này còn từ tin nhắn trước: tại sao Transaction vẫn cần user_id,
+    trong khi nó đã có account_id?
+
+  Chạy thử
+
+  cd "mint.com/v1_brute_force" && python3 models.py
+
+  Chừng nào còn sót chỗ ___ nào, Python sẽ báo NameError: name '___' is not 
+  defined. Đây là cách tự kiểm tra xem bạn đã điền hết chưa.
+
+  Điền xong bạn báo mình. Mình sẽ đọc file rồi review, sau đó đưa khung cho File
+  2: db.py.
+
+❯ <ide_opened_file>The user opened the file /home/huongpc/Documents/System      
+  Design/mint.com/v1_brute_force/models.py in the IDE. This may or may not be   
+  related to the current task.</ide_opened_file>                                
+
+❯ huongpc@huongpc:~$ cd "mint.com/v1_brute_force" && python3 models.py          
+  bash: cd: mint.com/v1_brute_force: No such file or directory                  
+  huongpc@huongpc:~$ cd /home/huongpc/Documents/System                          
+  Design/mint.com/v1_brute_force                                                
+  bash: cd: too many arguments                                                  
+  huongpc@huongpc:~$ cd Documents/System Design/mint.com/v1_brute_force         
+  bash: cd: too many arguments                                                  
+  what's wrong?                                                                 
+
+  Listed 1 directory (ctrl+o to expand)
+
+● File models.py của bạn vẫn nằm đúng chỗ. Ba lệnh lỗi là do hai nguyên nhân
+  khác nhau.
+
+  Lệnh 1: lỗi này do mình. Mình đưa một đường dẫn tương đối, và nó chỉ chạy được
+  khi bạn đang đứng sẵn trong thư mục System Design. Nhưng terminal của bạn
+  đang ở thư mục home (~), mà trong ~ thì không có mint.com.
+
+  Lệnh 2 và 3: tên thư mục System Design có dấu cách. Bash dùng dấu cách để tách
+  các tham số, nên nó hiểu là bạn gõ cd với hai tham số Documents/System và
+  Design/.... Vì thế mới báo too many arguments.
+
+  Cách sửa: đặt cả đường dẫn trong dấu ngoặc kép.
+
+  cd "/home/huongpc/Documents/System Design/mint.com/v1_brute_force" && python3 
+  models.py
+
+  Hoặc dùng dấu \ trước dấu cách:
+
+  cd ~/Documents/System\ Design/mint.com/v1_brute_force && python3 models.py
+
+  Mẹo: gõ cd ~/Documents/Sys rồi bấm Tab, bash sẽ tự điền tên và tự thêm \ trước
+  dấu cách. Còn nếu bạn mở terminal ngay trong VS Code (Ctrl+`) thì nó thường
+  đứng sẵn ở System Design, nên lệnh tương đối của mình sẽ chạy được.
+
+  Chạy xong bạn gửi mình output nhé. Nếu đã hết lỗi ___ thì báo mình để mình
+  review models.py.
+
+❯ làm sao để t có thể tải xuống toàn bộ đoạn chat này với bạn để t vào folder   
+  khác để prompt?                                                               
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Có hai cách lấy toàn bộ đoạn chat. Ngoài ra mình gợi ý thêm một cách gọn hơn
+  nếu mục đích của bạn là prompt tiếp ở folder khác.
+
+  Cách 1: Xuất ra file text (dễ đọc)
+
+  Mở terminal rồi chạy:
+
+  cd "/home/huongpc/Documents/System Design"
+  claude --resume c18605f4-62c6-4233-8731-d3cc14bbf777
+
+  Lệnh này mở lại đúng phiên chat hiện tại trong CLI. Khi đã vào, gõ:
+
+  /export mint-chat.txt
+
+  Claude Code sẽ ghi toàn bộ đoạn chat vào System Design/mint-chat.txt. Sau đó
+  bạn copy file này sang folder khác. Bạn có thể thử gõ /export ngay trong khung
+  chat VS Code trước. Nếu extension không hỗ trợ lệnh này thì dùng terminal như
+  trên.
+
+  Cách 2: Lấy file gốc
+
+  Mọi phiên chat đều được lưu tự động ở đây:
+
+  ~/.claude/projects/-home-huongpc-Documents-System-Design/c18605f4-62c6-4233-87
+  31-d3cc14bbf777.jsonl
+
+  Nhưng file này là JSON (khoảng 800 KB) và chứa cả các lệnh mình đã chạy, nên
+  không hợp để dán vào prompt.
+
+  Cách mình khuyên dùng
+
+  Dán nguyên đoạn chat vào prompt mới thì quá dài và lẫn nhiều thứ không cần, ví
+  dụ các lệnh ls, cat mình đã chạy. Thứ bạn thật sự cần mang theo chỉ có 3
+  phần:
+  - quy tắc học: mình không code thay, chỉ đưa khung điền chỗ trống;
+  - lộ trình đi từ brute force đến optimize;
+  - tiến độ hiện tại: đang ở File 1 models.py, kèm các quyết định đã chốt như
+    account_password_encrypted, external_id.
+
+  Phần context này mình đã lưu trong memory, nhưng memory chỉ tự nạp khi bạn mở 
+  đúng folder System Design. Nếu bạn cho mình biết folder mới, mình sẽ viết sẵn
+  một file CLAUDE.md tóm tắt 3 phần trên vào đó. Claude sẽ tự đọc file này mỗi
+  khi bạn mở folder, nên bạn không phải dán lại gì cả.
