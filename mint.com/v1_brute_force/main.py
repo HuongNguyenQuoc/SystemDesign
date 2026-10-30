@@ -6,10 +6,13 @@ from models import Category
 from security import Encryptor, load_key
 from categorizer import Categorizer, DEFAULT_SELLER_CATEGORY
 from account_service import AccountService
+from datetime import datetime
+from budget_service import BudgetService
 
 def main() -> None:
     db = InMemoryDB()
     bank = FakeBank()
+    budget_service = BudgetService(db=db)
 
     service = AccountService(
         db=db,
@@ -69,10 +72,31 @@ def main() -> None:
         "new purchase adds 1."
     )
 
+    # 1. Đặt ngân sách cho User
+    # TODO: Đặt budget cho FOOD là 100.00 và SHOPPING là 200.00 bằng db.set_budget(...)
+    db.set_budget(user_id=user.id, category=Category.FOOD, monthly_limit=Decimal("100.00"))
+    db.set_budget(user_id=user.id, category=Category.SHOPPING, monthly_limit=Decimal("200.00"))
+
+    # 2. Tính chi tiêu tháng hiện tại
+    now = datetime.now()
+    spending = budget_service.calculate_monthly_spending(user_id=user.id, year=now.year, month=now.month)
+    print("\nMonthly spending by category:", spending)
+
+    # 3. Kiểm tra cảnh báo ngân sách
+    notifications = budget_service.check_budget(user_id=user.id, year=now.year, month=now.month)
+    print("Budget notifications:", notifications)
+
+    # 4. Demo User override category của 1 giao dịch
+    # Lấy giao dịch đầu tiên và đổi sang Category khác
+    tx_to_change = db.transactions[0]
+    old_category = tx_to_change.category
+    new_category = Category.OTHER if old_category != Category.OTHER else Category.FOOD
+
+    budget_service.override_transaction_category(transaction_id=tx_to_change.id, new_category=new_category)
+    assert tx_to_change.category == new_category
+    print(f"\nOverride transaction category: {tx_to_change.id} from {old_category.value} to {new_category.value}")
+
+    print("\nv1_brute_force demo completed successfully.")
+
 if __name__ == "__main__":
     main()
-
-
-
-    
-
