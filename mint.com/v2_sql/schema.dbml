@@ -1,0 +1,63 @@
+// Database Markup Language (DBML)
+// Can be opened in VS Code (with DBML extension) or pasted into https://dbdiagram.io
+
+Table users {
+  id integer [pk, increment, note: "Auto-increment primary key"]
+  name text [not null]
+  monthly_income text [not null, note: "Stored as TEXT to map cleanly to Python Decimal"]
+
+  Note: "Represents a Mint user profile"
+}
+
+Table accounts {
+  id integer [pk, increment]
+  user_id integer [not null]
+  account_url text [not null]
+  account_login text [not null]
+  account_password_encrypted text [not null, note: "Fernet / AES encrypted bank credentials"]
+  created_at text [not null]
+  last_update text [null, note: "Timestamp of last transaction extraction (ISO 8601)"]
+
+  indexes {
+    user_id [name: "idx_accounts_user_id"]
+  }
+
+  Note: "Linked bank accounts per user"
+}
+
+Table transactions {
+  id integer [pk, increment]
+  account_id integer [not null]
+  user_id integer [not null, note: "Denormalized for fast user-level queries"]
+  external_id text [not null, note: "Bank transaction ID used for idempotency"]
+  created_at text [not null]
+  seller text [not null]
+  amount text [not null, note: "Monetary value stored as TEXT"]
+  category text [not null]
+
+  indexes {
+    (account_id, external_id) [unique, name: "uq_transactions_account_external", note: "Guarantees idempotent ingestion"]
+    (user_id, created_at) [name: "idx_transactions_user_date", note: "Composite index for fast monthly spending lookups"]
+  }
+
+  Note: "Individual financial transactions extracted from banks"
+}
+
+Table budgets {
+  id integer [pk, increment]
+  user_id integer [not null]
+  category text [not null]
+  monthly_limit text [not null]
+
+  indexes {
+    (user_id, category) [unique, name: "uq_budgets_user_category", note: "One budget per category per user"]
+  }
+
+  Note: "Spending limits set by user"
+}
+
+// Relationships (Foreign Keys)
+Ref: accounts.user_id > users.id [delete: cascade]
+Ref: transactions.user_id > users.id [delete: cascade]
+Ref: transactions.account_id > accounts.id [delete: cascade]
+Ref: budgets.user_id > users.id [delete: cascade]
