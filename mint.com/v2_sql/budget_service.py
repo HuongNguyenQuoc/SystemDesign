@@ -29,7 +29,7 @@ class BudgetService:
                 )
         return notifications
 
-    def override_transaction_category(self, transaction_id: int, new_category: Category) -> :
+    def override_transaction_category(self, transaction_id: int, new_category: Category) -> bool:
         """
         User chủ động sửa category cho một giao dịch cụ thể.
         """
