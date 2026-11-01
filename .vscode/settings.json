@@ -1,0 +1,10 @@
+{
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/mint.com/v2_sql",
+        "${workspaceFolder}/mint.com/v1_brute_force"
+    ],
+    "python.autoComplete.extraPaths": [
+        "${workspaceFolder}/mint.com/v2_sql",
+        "${workspaceFolder}/mint.com/v1_brute_force"
+    ]
+}
