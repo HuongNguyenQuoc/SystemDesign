@@ -145,6 +145,35 @@ class Database:
             for row in cursor.fetchall()
         ]
 
+    def get_transactions_by_month(self, user_id: int, year: int, month: int) -> list[Transaction]:
+        start_date = datetime(year, month, 1)
+        if month == 12:
+            end_date = datetime(year + 1, 1, 1)
+        else:
+            end_date = datetime(year, month + 1, 1)
+
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT * FROM transactions
+            WHERE user_id = ? AND created_at >= ? AND created_at < ?
+            """,
+            (user_id, start_date.isoformat(), end_date.isoformat())
+        )
+        return [
+            Transaction(
+                id=row["id"],
+                account_id=row["account_id"],
+                user_id=row["user_id"],
+                external_id=row["external_id"],
+                created_at=datetime.fromisoformat(row["created_at"]),
+                seller=row["seller"],
+                amount=Decimal(row["amount"]),
+                category=Category(row["category"])
+            )
+            for row in cursor.fetchall()
+        ]
+    
     def update_transaction_category(self, transaction_id: int, new_category: Category) -> bool:
         cursor = self.conn.cursor()
         # TODO 3: Thực thi UPDATE transactions SET category = ? WHERE id = ?
