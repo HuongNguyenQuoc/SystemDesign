@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from unicodedata import category
 
 class Category(Enum):
     HOUSING = "housing"
